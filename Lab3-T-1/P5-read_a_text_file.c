@@ -8,7 +8,7 @@ This is a program for you to read the line of text from a data file data.txt.
 #include <string.h>
 #include <stdlib.h>
 
-int main()
+int main(int argc, char **argv)
 {
 	char c[100];
 	FILE *fptr;
@@ -16,7 +16,13 @@ int main()
 	int sig;
 	char check[12] = "end_header\n";
 
-	strcpy(file_name, "data.txt"); // copy a string from the commond line to get the file name
+	/* Verify the correct number of arguments were passed in */
+	if (argc != 2)
+	{
+		fprintf(stderr, "USAGE:./main.out data.txt\n");
+	}
+
+	strcpy(file_name, argv[1]); // copy a string from the commond line to get the file name
 
 	if ((fptr = fopen(file_name, "r")) == NULL)
 	{
