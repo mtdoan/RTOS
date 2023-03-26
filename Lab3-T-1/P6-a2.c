@@ -21,7 +21,7 @@ buffer_item buffer[BUFFER_SIZE]; /* the buffer */
 
 sem_t semaphore_b; /* the semaphores */
 int fd[2];         // File descriptor for creating a pipe
-int fd_fifo;
+int fd_bc[2];
 pthread_t tid_a, tid_b; // Thread ID
 pthread_attr_t attr;    // Set of thread attributes
 
@@ -36,12 +36,15 @@ void initializeData();
 int main()
 {
   int result;
+  int result_bc;
   printf("Start Assignment 2\n");
 
   void initializeData(); // run initialisation
 
   result = pipe(fd);
-  if (result < 0)
+  result_bc = pipe(fd_bc);
+
+  if (result < 0 || result_bc < 0)
   {
     perror("An error ocurred with opening the pipe");
     exit(1);
@@ -96,7 +99,7 @@ void *write_to_pipe(void *param)
 
     printf("%s", c);
   }
-  printf("End reading file in thread A\n");
+  printf("Writing data to pipe AB has completed in thread A\n");
   fclose(fptr);
   close(fd[1]);
   sem_post(&semaphore_b);
@@ -122,8 +125,18 @@ void *read_from_pipe(void *param)
     {
       string_to_read[len] = '\0';
       printf("%s\n", string_to_read);
-      printf("Reading pipe has completed in thread B\n");
+      printf("Reading pipe AB has completed in thread B\n");
       close(fd[0]);
+      //
+      int written_bytes = write(fd_bc[1], string_to_read, len);
+      if (written_bytes != len)
+      {
+        perror("An error ocurred with writting data into the pipe");
+        exit(2);
+      } else {
+        printf("Writing data to pipe BC has completed in thread B\n");
+      }
+      //
       free(string_to_read);
       exit(0);
     }
@@ -133,6 +146,7 @@ void *read_from_pipe(void *param)
       exit(1);
     }
     string_to_read[len] = ch[0];
+    
     len++;
     if (len == cap)
     {
