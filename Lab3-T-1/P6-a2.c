@@ -2,7 +2,7 @@
    ----- 48450 -- week 4 lab handout 1.2 ------
 This is a program to use pipe to transfer the message from Thread A to Thread B.
 
-Question: How this program can control the critical secion in memory?
+Question: How this program can control the critical secion in memory?/au/courses/9615/workspaces
 */
 // gcc P6-a2.c -o P6.o -pthread && ./P6.o
 
@@ -19,10 +19,10 @@ typedef char buffer_item;
 
 buffer_item buffer[BUFFER_SIZE]; /* the buffer */
 
-sem_t semaphore_b; /* the semaphores */
+sem_t semaphore_2, semaphore_3; /* the semaphores */
 int fd[2];         // File descriptor for creating a pipe
 int fd_bc[2];
-pthread_t tid_a, tid_b; // Thread ID
+pthread_t tid_1, tid_2, tid_3; // Thread ID
 pthread_attr_t attr;    // Set of thread attributes
 
 /*This function continously reads fd[0] for any input data byte
@@ -30,6 +30,8 @@ If available, prints */
 
 void *write_to_pipe(void *param); // thread call write_to_pipe function
 void *read_from_pipe(void *param);
+void *read_from_pipe_bc(void *param);
+
 void *writer(void *param); // thread call write function
 void initializeData();
 
@@ -50,27 +52,36 @@ int main()
     exit(1);
   }
 
-  /*create the thread A*/
-  if (pthread_create(&tid_a, &attr, write_to_pipe, NULL) != 0)
+  /*create the thread 1*/
+  if (pthread_create(&tid_1, &attr, write_to_pipe, NULL) != 0)
   {
     perror("failed create thread 1\n");
     exit(1);
   }
 
-  /*create the thread B*/
-  if (pthread_create(&tid_b, &attr, read_from_pipe, NULL) != 0)
+  /*create the thread 2*/
+  if (pthread_create(&tid_2, &attr, read_from_pipe, NULL) != 0)
   {
-    perror("failed create thread 1\n");
+    perror("failed create thread 2\n");
     exit(1);
   }
+  
+  /*create the thread 3*/
+  if (pthread_create(&tid_3, &attr, read_from_pipe_bc, NULL) != 0)
+  {
+    perror("failed create thread 3\n");
+    exit(1);
+  }
+
   /*wait for the thread to exit*/
-  pthread_join(tid_a, NULL);
-  pthread_join(tid_b, NULL);
+  pthread_join(tid_1, NULL);
+  pthread_join(tid_2, NULL);
+  pthread_join(tid_3, NULL);
 
   return 0;
 }
 
-// thread A writes data
+// thread 1 writes data
 void *write_to_pipe(void *param)
 {
   printf("In writing thread A\n");
@@ -96,19 +107,18 @@ void *write_to_pipe(void *param)
       perror("An error ocurred with writting data into the pipe");
       exit(2);
     }
-
     printf("%s", c);
   }
   printf("Writing data to pipe AB has completed in thread A\n");
   fclose(fptr);
   close(fd[1]);
-  sem_post(&semaphore_b);
+  sem_post(&semaphore_2);
 }
 
-// thread B reads data
+// thread 2 reads data
 void *read_from_pipe(void *param)
 {
-  sem_wait(&semaphore_b);
+  sem_wait(&semaphore_2);
   printf("______________________\n\n");
   printf("In reading thread B\n");
   char ch[1];
@@ -135,6 +145,7 @@ void *read_from_pipe(void *param)
         exit(2);
       } else {
         printf("Writing data to pipe BC has completed in thread B\n");
+        sem_post(&semaphore_3);
       }
       //
       free(string_to_read);
@@ -161,11 +172,28 @@ void *read_from_pipe(void *param)
   }
 }
 
+// thread 3 reads data from pipe BC
+void *read_from_pipe_bc(void *param)
+{
+  sem_wait(&semaphore_3);
+  printf("______________________\n\n");
+  printf("Invoke thread 3\n");
+  printf("Invoke thread 31\n");
+  printf("Invoke thread 32\n");
+  fflush(stdout);
+  exit(0);
+}
+
 void initializeData()
 {
-  if (sem_init(&semaphore_b, 0, 0) != 0)
+  if (sem_init(&semaphore_2, 0, 0) != 0)
   {
-    printf("\nsem_b has failed\n");
+    printf("semaphore_2 has failed\n");
+    exit(1);
+  }
+  if (sem_init(&semaphore_3, 0, 0) != 0)
+  {
+    printf("semaphore_3 has failed\n");
     exit(1);
   }
 
