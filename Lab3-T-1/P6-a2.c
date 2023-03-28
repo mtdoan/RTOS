@@ -14,16 +14,13 @@ Question: How this program can control the critical secion in memory?/au/courses
 #include <unistd.h>
 #include <fcntl.h>
 
-typedef char buffer_item;
 #define BUFFER_SIZE 100
 
-buffer_item buffer[BUFFER_SIZE]; /* the buffer */
-
-sem_t semaphore_2, semaphore_3; /* the semaphores */
-int fd[2];         // File descriptor for creating a pipe
-int fd_bc[2];
+volatile sem_t semaphore_2, semaphore_3; /* the semaphores */
+volatile int fd[2];                      // File descriptor for creating a pipe
+volatile int fd_bc[2];
 pthread_t tid_1, tid_2, tid_3; // Thread ID
-pthread_attr_t attr;    // Set of thread attributes
+pthread_attr_t attr;           // Set of thread attributes
 
 /*This function continously reads fd[0] for any input data byte
 If available, prints */
@@ -37,6 +34,11 @@ void initializeData();
 
 int main()
 {
+  FILE *fptr;
+  fptr = fopen("output.txt", "w");
+  fputs("hello", fptr);
+  fclose(fptr);
+
   int result;
   int result_bc;
   printf("Start Assignment 2\n");
@@ -65,7 +67,7 @@ int main()
     perror("failed create thread 2\n");
     exit(1);
   }
-  
+
   /*create the thread 3*/
   if (pthread_create(&tid_3, &attr, read_from_pipe_bc, NULL) != 0)
   {
@@ -84,7 +86,7 @@ int main()
 // thread 1 writes data
 void *write_to_pipe(void *param)
 {
-  printf("In writing thread A\n");
+  printf("Inside thread 1\n");
 
   char c[100];
   FILE *fptr;
@@ -93,7 +95,7 @@ void *write_to_pipe(void *param)
   if (fptr == NULL)
   {
     perror("An error ocurred with opening input file");
-    exit(1);
+    pthread_exit(1);
   }
 
   printf("reading from the file data.txt:\n");
@@ -105,7 +107,7 @@ void *write_to_pipe(void *param)
     if (written_bytes != len)
     {
       perror("An error ocurred with writting data into the pipe");
-      exit(2);
+      pthread_exit(2);
     }
     printf("%s", c);
   }
@@ -120,7 +122,7 @@ void *read_from_pipe(void *param)
 {
   sem_wait(&semaphore_2);
   printf("______________________\n\n");
-  printf("In reading thread B\n");
+  printf("Inside thread 2\n");
   char ch[1];
   size_t len = 0;
   size_t cap = 100;
@@ -142,22 +144,24 @@ void *read_from_pipe(void *param)
       if (written_bytes != len)
       {
         perror("An error ocurred with writting data into the pipe");
-        exit(2);
-      } else {
-        printf("Writing data to pipe BC has completed in thread B\n");
+        pthread_exit(2);
+      }
+      else
+      {
+        printf("Writing data to pipe BC has completed in thread 2\n");
         sem_post(&semaphore_3);
       }
       //
       free(string_to_read);
-      exit(0);
+      pthread_exit(0);
     }
     else if (reading_result == -1)
     {
       perror("An error ocurred with reading data from the pipe");
-      exit(1);
+      pthread_exit(1);
     }
     string_to_read[len] = ch[0];
-    
+
     len++;
     if (len == cap)
     {
@@ -167,7 +171,7 @@ void *read_from_pipe(void *param)
     if (!string_to_read)
     {
       fprintf(stderr, "%s\n", "Error while allocating memory\n");
-      exit(1);
+      pthread_exit(1);
     }
   }
 }
@@ -176,12 +180,45 @@ void *read_from_pipe(void *param)
 void *read_from_pipe_bc(void *param)
 {
   sem_wait(&semaphore_3);
-  printf("______________________\n\n");
-  printf("Invoke thread 3\n");
+  printf("______________________\n");
+  printf("Inside thread 3\n");
   printf("Invoke thread 31\n");
   printf("Invoke thread 32\n");
-  fflush(stdout);
-  exit(0);
+
+  char c[BUFFER_SIZE];
+  char *check = "end_header\n";
+  int sig;
+  int reading_result;
+  FILE *fptr;
+  fptr = fopen("output.txt", "w");
+  if (fptr == NULL)
+  {
+    printf("Error!");
+    pthread_exit(1);
+  }
+  fprintf(fptr, "Hello");
+
+  while (1)
+  {
+    reading_result = read(fd_bc[0], c, BUFFER_SIZE);
+    printf("%s\n", c);
+    fprintf(fptr, "%s", c);
+    if (reading_result == 0)
+    {
+      printf("Reading pipe BC has completed in thread 3\n");
+      close(fd_bc[0]);
+      fclose(fptr);
+      pthread_exit(0);
+    }
+    else if (reading_result == -1)
+    {
+      perror("An error ocurred with reading data from the pipe BC");
+      fclose(fptr);
+      pthread_exit(1);
+    }
+  }
+  fclose(fptr);
+  pthread_exit(0);
 }
 
 void initializeData()
@@ -189,12 +226,12 @@ void initializeData()
   if (sem_init(&semaphore_2, 0, 0) != 0)
   {
     printf("semaphore_2 has failed\n");
-    exit(1);
+    pthread_exit(1);
   }
   if (sem_init(&semaphore_3, 0, 0) != 0)
   {
     printf("semaphore_3 has failed\n");
-    exit(1);
+    pthread_exit(1);
   }
 
   /*get the default attributes*/
