@@ -152,6 +152,7 @@ void *read_from_pipe(void *param)
         sem_post(&semaphore_3);
       }
       //
+      fclose(fd_bc[1]);
       free(string_to_read);
       pthread_exit(0);
     }
