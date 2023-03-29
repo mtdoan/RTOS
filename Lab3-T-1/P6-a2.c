@@ -111,7 +111,6 @@ void *write_to_pipe(void *param)
     }
     printf("%s", c);
   }
-  write(fd[1], "\n", 1);
   printf("Writing data to pipe AB has completed in thread A\n");
   fclose(fptr);
   close(fd[1]);
@@ -137,30 +136,34 @@ void *read_from_pipe(void *param)
       exit(1);
     }
 
-    // reaches the end of pipe
-    if (reading_result == 0)
+    char toSend = 0;
+    if (reading_result == 1)
     {
-      close(fd[0]);
-      break;
-    }
-
-    // string_to_read += ch;
-    string_to_read[len] = ch[0];
-    len++;
-    // increase the size of string_to_read
-
-    if (len == cap)
-    {
-      cap *= 2;
-      string_to_read = realloc(string_to_read, cap * sizeof(char));
-      if (!string_to_read)
+      // string_to_read += ch;
+      string_to_read[len] = ch[0];
+      len++;
+      // increase the size of string_to_read
+      if (len == cap)
       {
-        perror("Error while allocating memory");
-        exit(1);
+        cap *= 2;
+        string_to_read = realloc(string_to_read, cap * sizeof(char));
+        if (!string_to_read)
+        {
+          perror("Error while allocating memory");
+          exit(1);
+        }
       }
+
+      toSend = (ch[0] == '\n');
+    }
+    else if (reading_result == 0)
+    {
+      toSend = 1;
     }
 
-    if (string_to_read[len - 1] == '\n')
+    // reaches the end of pipe
+
+    if (toSend)
     {
       string_to_read[len] = '\0';
       printf("%s", string_to_read);
@@ -172,6 +175,11 @@ void *read_from_pipe(void *param)
         exit(2);
       }
       len = 0;
+    }
+
+    if (reading_result == 0)
+    {
+      break;
     }
   }
 
@@ -215,13 +223,13 @@ void *read_from_pipe_bc(void *param)
       fclose(fptr);
       exit(1);
     }
-    
+
     if (reading_result == 0)
     {
       close(fd_bc[0]);
       break;
     }
-    
+
     string_to_write[len] = ch[0];
     len++;
 
