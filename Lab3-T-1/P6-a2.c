@@ -107,10 +107,11 @@ void *write_to_pipe(void *param)
     if (written_bytes != len)
     {
       perror("An error ocurred with writting data into the pipe");
-      pthread_exit(2);
+      exit(2);
     }
     printf("%s", c);
   }
+  write(fd[1], "\n", 1);
   printf("Writing data to pipe AB has completed in thread A\n");
   fclose(fptr);
   close(fd[1]);
@@ -126,55 +127,59 @@ void *read_from_pipe(void *param)
   char ch[1];
   size_t len = 0;
   size_t cap = 100;
-  char *string_to_read;
-  string_to_read = malloc(cap * sizeof(char));
-  int reading_result;
-
+  char *string_to_read = malloc(cap * sizeof(char));
   while (1)
   {
-    reading_result = read(fd[0], ch, 1);
-    if (reading_result == 0)
-    {
-      string_to_read[len] = '\0';
-      printf("%s\n", string_to_read);
-      printf("Reading pipe AB has completed in thread B\n");
-      close(fd[0]);
-      //
-      int written_bytes = write(fd_bc[1], string_to_read, len);
-      if (written_bytes != len)
-      {
-        perror("An error ocurred with writting data into the pipe");
-        pthread_exit(2);
-      }
-      else
-      {
-        printf("Writing data to pipe BC has completed in thread 2\n");
-        sem_post(&semaphore_3);
-      }
-      //
-      close(fd_bc[1]);
-      free(string_to_read);
-      pthread_exit(0);
-    }
-    else if (reading_result == -1)
+    int reading_result = read(fd[0], ch, 1);
+    if (reading_result == -1)
     {
       perror("An error ocurred with reading data from the pipe");
-      pthread_exit(1);
+      exit(1);
     }
-    string_to_read[len] = ch[0];
 
+    // reaches the end of pipe
+    if (reading_result == 0)
+    {
+      close(fd[0]);
+      break;
+    }
+
+    // string_to_read += ch;
+    string_to_read[len] = ch[0];
     len++;
+    // increase the size of string_to_read
+
     if (len == cap)
     {
       cap *= 2;
       string_to_read = realloc(string_to_read, cap * sizeof(char));
+      if (!string_to_read)
+      {
+        perror("Error while allocating memory");
+        exit(1);
+      }
     }
-    if (!string_to_read)
+
+    if (string_to_read[len - 1] == '\n')
     {
-      fprintf(stderr, "%s\n", "Error while allocating memory\n");
-      pthread_exit(1);
+      string_to_read[len] = '\0';
+      printf("%s", string_to_read);
+
+      int written_bytes = write(fd_bc[1], string_to_read, len);
+      if (written_bytes != len)
+      {
+        perror("An error ocurred with writting data into the pipe");
+        exit(2);
+      }
+      len = 0;
     }
   }
+
+  printf("Writing data to pipe BC has completed in thread 2\n");
+  close(fd_bc[1]);
+  sem_post(&semaphore_3);
+  free(string_to_read);
+  pthread_exit(0);
 }
 
 // thread 3 reads data from pipe BC
@@ -186,38 +191,49 @@ void *read_from_pipe_bc(void *param)
   printf("Invoke thread 31\n");
   printf("Invoke thread 32\n");
 
-  char c[BUFFER_SIZE];
   char *check = "end_header\n";
-  int sig;
+
+  char ch[1];
+  size_t len = 0;
+  char *string_to_write = malloc(BUFFER_SIZE * sizeof(char));
+
   int reading_result;
   FILE *fptr;
   fptr = fopen("output.txt", "w");
   if (fptr == NULL)
   {
-    printf("Error!");
-    pthread_exit(1);
+    perror("An error ocurred with openning output.txt file");
+    exit(1);
   }
-  fprintf(fptr, "Hello");
 
   while (1)
   {
-    reading_result = read(fd_bc[0], c, BUFFER_SIZE);
-    printf("%s\n", c);
-    fprintf(fptr, "%s", c);
-    if (reading_result == 0)
-    {
-      printf("Reading pipe BC has completed in thread 3\n");
-      close(fd_bc[0]);
-      fclose(fptr);
-      pthread_exit(0);
-    }
-    else if (reading_result == -1)
+    reading_result = read(fd_bc[0], ch, 1);
+    if (reading_result == -1)
     {
       perror("An error ocurred with reading data from the pipe BC");
       fclose(fptr);
-      pthread_exit(1);
+      exit(1);
+    }
+    
+    if (reading_result == 0)
+    {
+      close(fd_bc[0]);
+      break;
+    }
+    
+    string_to_write[len] = ch[0];
+    len++;
+
+    if (string_to_write[len - 1] == '\n')
+    {
+      string_to_write[len] = '\0';
+      printf("%s", string_to_write);
+      fprintf(fptr, "%s", string_to_write);
+      len = 0;
     }
   }
+  printf("Reading pipe BC has completed in thread 3\n");
   fclose(fptr);
   pthread_exit(0);
 }
@@ -227,12 +243,12 @@ void initializeData()
   if (sem_init(&semaphore_2, 0, 0) != 0)
   {
     printf("semaphore_2 has failed\n");
-    pthread_exit(1);
+    exit(1);
   }
   if (sem_init(&semaphore_3, 0, 0) != 0)
   {
     printf("semaphore_3 has failed\n");
-    pthread_exit(1);
+    exit(1);
   }
 
   /*get the default attributes*/
