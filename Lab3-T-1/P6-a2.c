@@ -200,7 +200,7 @@ void *read_from_pipe_bc(void *param)
   printf("Invoke thread 32\n");
 
   char *check = "end_header\n";
-
+  int sig = 0;
   char ch[1];
   size_t len = 0;
   char *string_to_write = malloc(BUFFER_SIZE * sizeof(char));
@@ -237,7 +237,16 @@ void *read_from_pipe_bc(void *param)
     {
       string_to_write[len] = '\0';
       printf("%s", string_to_write);
-      fprintf(fptr, "%s", string_to_write);
+      if (sig == 1)
+      {
+        fprintf(fptr, "%s", string_to_write);
+      }
+      if ((sig == 0) && strcmp(string_to_write, check) == 0)
+      {
+        // Yes. The end of header
+        sig = 1;
+        printf("HERE\n");
+      }
       len = 0;
     }
   }
