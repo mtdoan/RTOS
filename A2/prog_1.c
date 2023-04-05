@@ -3,7 +3,8 @@
 //***********************************************************************************
 /*
   To compile prog_1 ensure that gcc is installed and run the following command:
-  gcc prog_1.c -o prog_1 -lpthread -lrt -Wall && ./prog_1
+  gcc prog_1.c -o prog_1 -lpthread -lrt -Wall
+  gcc assign2_template-v3.c -o a2.o -lpthread -lrt -Wall && ./a2.o
 */
 
 #include <pthread.h>
@@ -108,9 +109,8 @@ void initializeData(ThreadParams *params)
 
 void *ThreadA(void *params)
 {
-  ThreadParams *TP = params;
-  sem_wait(&(TP->sem_A));
   printf("\nThread A reads from data.txt\n");
+  ThreadParams *TP = params;
   FILE *reader;
   char file_name[9] = "data.txt";
   reader = fopen(file_name, "r");
@@ -145,7 +145,7 @@ void *ThreadB(void *params)
   sem_wait(&(TP->sem_B));
   printf("\nThread B reads data from pipe used in ThreadA and writes it to a shared variable\n");
   message_len = read(TP->pipeFile[0], TP->message, BUFFER_SIZE);
-  TP->message[message_len] = '\0';
+  TP->message[message_len + 1] = '\0';
   printf("Thread B - message:\n%s", TP->message);
   close(TP->pipeFile[0]);
   sem_post(&(TP->sem_C));
@@ -171,7 +171,7 @@ void *ThreadC(void *params)
   int index = 0;
   size_t len = 0;
 
-  for (index = 0; index <= message_len; index++ )
+  for (index = 0; index <= message_len + 1; index++)
   {
     string_to_write[len] = TP->message[index];
     len++;
@@ -199,4 +199,3 @@ void *ThreadC(void *params)
   fclose(writer);
   pthread_exit(0);
 }
-
